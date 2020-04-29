@@ -39,6 +39,11 @@ class AddCommand(EnvCommand, InitCommand):
             None,
             "Output the operations but do not execute anything (implicitly enables --verbose).",
         ),
+        option(
+            "editable",
+            None,
+            "Install a local source package to the environment in editable mode.",
+        ),
     ]
 
     help = """The add command adds required packages to your <comment>pyproject.toml</> and installs them.
@@ -47,6 +52,17 @@ If you do not specify a version constraint, poetry will choose a suitable one ba
 """
 
     loggers = ["poetry.repositories.pypi_repository"]
+
+    def _write_editable_uninstall_commands(self, requirements):
+        editable_uninstall = """
+This packages were installed in <info>editable mode</> and were not included on
+pyproject.toml and poetry.lock.
+
+To uninstall them use:
+<info>{}</>
+"""
+        commands = [" * pip uninstall {}".format(r['name']) for r in requirements]
+        self.io.write(editable_uninstall.format("\n".join(commands)))
 
     def handle(self):
         from poetry.installation.installer import Installer
@@ -142,6 +158,7 @@ If you do not specify a version constraint, poetry will choose a suitable one ba
         )
 
         installer.dry_run(self.option("dry-run"))
+        installer.editable(self.option("editable"))
         installer.update(True)
         installer.whitelist([r["name"] for r in requirements])
 
@@ -152,14 +169,20 @@ If you do not specify a version constraint, poetry will choose a suitable one ba
 
             raise
 
-        if status != 0 or self.option("dry-run"):
+        need_revert_command = (
+            self.option("dry-run") or
+            self.option("editable")
+        )
+        if status != 0 or need_revert_command:
             # Revert changes
-            if not self.option("dry-run"):
+            if status != 0:
                 self.error(
                     "\n"
                     "Addition failed, reverting pyproject.toml "
                     "to its original content."
                 )
+            elif self.option("editable"):
+                self._write_editable_uninstall_commands(requirements)
 
             self.poetry.file.write(original_content)
 

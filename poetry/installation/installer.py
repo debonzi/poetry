@@ -39,6 +39,7 @@ class Installer:
         self._pool = pool
 
         self._dry_run = False
+        self._editable = False
         self._update = False
         self._verbose = False
         self._write_lock = True
@@ -70,6 +71,9 @@ class Installer:
             self._write_lock = False
             self._execute_operations = False
 
+        if self.is_editable():
+            self._write_lock = False
+
         local_repo = Repository()
         self._do_install(local_repo)
 
@@ -79,6 +83,14 @@ class Installer:
         self._dry_run = dry_run
 
         return self
+
+    def editable(self, editable=True):  # type: (bool) -> Installer
+        self._editable = editable
+
+        return self
+
+    def is_editable(self):  # type: () -> bool
+        return self._editable
 
     def is_dry_run(self):  # type: () -> bool
         return self._dry_run
